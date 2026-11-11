@@ -1,0 +1,12 @@
+{
+  "IGUI_PZDirector_Title": "PZDirector - Filming",
+  "IGUI_PZDirector_Actor": "Character: The approach",
+  "IGUI_PZDirector_Observer": "Observation: Crossings",
+  "IGUI_PZDirector_Start": "Start a take (5 s delay)",
+  "IGUI_PZDirector_Stop": "Stop the take",
+  "IGUI_PZDirector_Idle": "Ready",
+  "IGUI_PZDirector_Requirements": "Solo -debug, outside, clear 13 x 9 tile area.",
+  "IGUI_PZDirector_Recording": "Start video recording before starting the take.",
+  "IGUI_PZDirector_Emergency": "Stop: Ctrl + Shift + F11, even with UI hidden.",
+  "IGUI_PZDirector_Error": "Failed: see console.txt and PZPuppet/last-report.txt."
+}

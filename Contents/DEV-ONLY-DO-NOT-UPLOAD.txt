@@ -1,0 +1,5 @@
+PZDevKit is a DEV-ONLY local development tool. Never upload it to the Steam Workshop.
+
+This file is deliberately placed at the root of Contents/: Project Zomboid's upload screen refuses any file there
+(SteamWorkshopItem.validateContents, error FileNotAllowedInContents), and the local publishing tool refuses any project
+that contains it. Do not move or delete it.

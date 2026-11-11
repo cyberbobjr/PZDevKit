@@ -1,0 +1,5 @@
+name=batman_PZDevKit (DEV-ONLY)
+id=batman_PZDevKit
+description=DEV-ONLY development tool: automated test driver, live Lua channel, world helpers, scripted scenarios and video takes. Requires -debug. Never publish. Does nothing without its command files.
+versionMin=42.21
+modversion=0.1.0

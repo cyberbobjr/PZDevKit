@@ -1,0 +1,48 @@
+// Minimal pzdev configuration for another mod: copy it as <Project>/autotest.json and adapt.
+// Full reference: PZDevKit/docs/wiki/fr/01-tests-automatiques.md. Lines starting with // are comments (removed before parsing).
+//   python PZDevKit/pzdev.py check  MyProject
+//   python PZDevKit/pzdev.py sp     MyProject -P case=smoke
+//   python PZDevKit/pzdev.py server MyProject
+{
+  "name": "MyProject",
+  // Mods in load order (requirements first). "path" is relative to this file; "workshop" is a Workshop item number
+  // read (never written) from steamapps/workshop/content/108600, with the mod id when the item holds several mods.
+  // The driver mod batman_PZDevKit (PZDevKit project) is added last automatically.
+  "mods": [
+    {"workshop": "3694097672", "id": "TooltipLib"},
+    {"path": "Contents/mods/batman_MyProject"}
+  ],
+  // Either a hooks file (Lua chunk returning { start, done, result } or { client = {...}, server = {...} }) ...
+  //   "hooks": "autotest/hooks.lua",
+  // ... or inline Lua bodies (P = ctx.params). Here: a global self-test of the mod that sets MyProject.Test.
+  "lua": {
+    "start": ["if not MyProject or not MyProject.selfTest then return false, 'MyProject.selfTest missing' end",
+              "MyProject.selfTest(P.case or 'smoke')",
+              "return true"],
+    "done": "return MyProject.Test ~= nil and MyProject.Test.finished == true",
+    "result": "return MyProject.Test.ok, MyProject.Test.summary, MyProject.Test.lines"
+  },
+  // Default hook parameters (overridden by -P name=value).
+  "params": {"case": "smoke"},
+  // Files of <cache>/Lua copied to the run folder (glob, relative to Zomboid/Lua), besides status/result/console.
+  "collect": ["batman_MyProject/*.txt"],
+  "sp": {
+    // Save of %USERPROFILE%\Zomboid\Saves\<gameMode> copied (exact folder name or glob: the most recent match).
+    "save": "mytest*",
+    "gameMode": "Sandbox",
+    "timeoutSec": 600
+  },
+  "server": {
+    "serverName": "pzat_myproject",
+    "port": 17381,
+    "timeoutSec": 600,
+    "ini": {"Map": "Muldraugh, KY"}
+  },
+  "mp": {
+    "port": 17391,
+    "spawn": "10656,10137,0",
+    "clients": 1,
+    "clientXmx": "3072m",
+    "clientRun": false
+  }
+}

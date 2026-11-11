@@ -1,0 +1,12 @@
+{
+  "IGUI_PZDirector_Title": "PZDirector - Tournage",
+  "IGUI_PZDirector_Actor": "Personnage : L'approche",
+  "IGUI_PZDirector_Observer": "Observation : Traversees",
+  "IGUI_PZDirector_Start": "Lancer une prise (delai de 5 s)",
+  "IGUI_PZDirector_Stop": "Arreter la prise",
+  "IGUI_PZDirector_Idle": "En attente",
+  "IGUI_PZDirector_Requirements": "Solo -debug, dehors, espace libre de 13 x 9 cases.",
+  "IGUI_PZDirector_Recording": "Demarrer la capture video avant de lancer la prise.",
+  "IGUI_PZDirector_Emergency": "Arret : Ctrl + Maj + F11, meme sans interface.",
+  "IGUI_PZDirector_Error": "Echec : details dans console.txt et PZPuppet/last-report.txt."
+}

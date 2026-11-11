@@ -1,0 +1,26 @@
+LOG  : General      f:0> 11-11-2026 11:57:02
+LOG  : General      f:0> ===== System specs =====
+LOG  : General      f:0> version=42.22.2 3d39148846 integrity=pending demo=false
+ERROR: General      f:0 at AngelCodeFont.parseFnt              > AngelCodeFont failed to load page 0 texture GAME/media/mainfont_0.png
+LOG  : Mod          f:0> loading batman_SignalSmoke
+LOG  : Mod          f:0> mod "batman_SignalSmoke" overrides media/lua/shared/translate/ru/tooltip.json
+LOG  : Mod          f:0> loading batman_PZDevKit
+LOG  : General      f:0> version=42.22.2 3d39148846 classpath=11 demo=false
+LOG  : Mod          f:0> loading batman_SignalSmoke
+LOG  : Mod          f:0> loading batman_PZDevKit
+LOG  : Lua          f:285> [PZAT] status cb670d53eaf2 run started
+LOG  : Lua          f:286> [SignalSmoke] start refused: x and y must be integers
+WARN : General      f:7309 at Lua.spawnZombies> Spawning new F
+LOG  : Lua          f:5901> [PZAT] status cb670d53eaf2 done PZAT-RESULT ok=true side=client durationMs=93605 summary=sp 41 PASS, 0 FAIL
+ERROR: General      f:6590> Lua(Vanilla).=pzdev> Exception thrown
+	se.krka.kahlua.vm.KahluaException: deliberate test error at BaseLib.error(BaseLib.java:307).
+	Stack trace:
+		se.krka.kahlua.stdlib.BaseLib.error(BaseLib.java:307)
+		se.krka.kahlua.vm.KahluaThread.callJava(KahluaThread.java:178)
+		Lua(Vanilla).=pzdev(spawnpoints.lua:1)
+		Lua((MOD:batman_PZDevKit (DEV-ONLY))).run(Live.lua:105)
+		se.krka.kahlua.vm.KahluaThread.pcall(KahluaThread.java:1740)
+		zombie.GameWindow.logic(GameWindow.java:391)
+LOG  : Lua          f:6600> [PZDevKit] info still running
+ERROR: General      f:7000 at FluidContainerScript.load           > Sanitizing container name 'Large Bucket', name may not contain whitespaces.
+LOG  : General      f:7381> WeatherPeriod: Adding stage 'STORM' with duration: 1.0%.
