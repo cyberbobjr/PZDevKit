@@ -158,6 +158,78 @@ class TutoTest(unittest.TestCase):
         removed = list(self.lua.globals().REMOVED.values())
         self.assertEqual(sorted(removed), ['Inspect', 'Teleport'])  # the foreign Inspect only
 
+    POSE_FAKES = r'''T = PZDevKit.Tuto.new(); T.player = PLAYER
+        PLAYER.vars = {}; PLAYER.events = {}; PLAYER.ground = false; PLAYER.furniture = false; PLAYER.sneak = false
+        PLAYER.setVariable = function(s, k, v) s.vars[k] = v end
+        PLAYER.getVariableBoolean = function(s, k) return s.vars[k] == true end
+        PLAYER.playEmote = function(s, n) s.vars.emote = n; s.vars.EmotePlaying = true end
+        PLAYER.reportEvent = function(s, e) s.events[#s.events + 1] = e end
+        PLAYER.isSitting = function(s) return s.ground or s.furniture end
+        PLAYER.setSneaking = function(s, v) s.sneak = v end
+        PLAYER.StopAllActionQueue = function(s) s.stopped = true end
+        PLAYER.setAutoWalk = function() end
+        ISTimedActionQueue.add = function(a) QUEUE[#QUEUE + 1] = a end
+        ISRestAction = { new = function(_, who, bed, anims) return { kind = "rest", bed = bed, anims = anims } end }
+        ISPathFindAction = { pathToSitOnFurniture = function(_, who, bed, any)
+            local a = { kind = "path", bed = bed, any = any }
+            a.setOnComplete = function(self, f, ...) self.done = { f, ... } end
+            a.setOnFail = function(self, f) self.fail = f end
+            a.addAfter = function(self, x) self.after = x; return x end
+            return a end }'''
+
+    def test_emote_plays_a_vanilla_gesture_until_it_ends(self):
+        self.lua.execute(self.POSE_FAKES)
+        self.lua.execute('T.emote("thumbsup")')
+        self.assertEqual(self.lua.eval('PLAYER.vars.emote'), 'thumbsup')
+        self.assertFalse(self.lua.eval('T.emoteDone()'))
+        self.lua.execute('PLAYER.vars.EmotePlaying = false')  # the game ends the animation
+        self.assertTrue(self.lua.eval('T.emoteDone()'))
+
+    def test_emote_hold_stops_a_looping_gesture(self):
+        self.lua.execute(self.POSE_FAKES)
+        self.lua.execute('T.emote("surrender", 2)')
+        self.lua.globals().CLOCK += 1500
+        self.assertFalse(self.lua.eval('T.emoteDone()'))
+        self.lua.globals().CLOCK += 600
+        self.assertTrue(self.lua.eval('T.emoteDone()'))
+
+    def test_emote_rejects_unknown_ids_and_bad_hold(self):
+        self.lua.execute(self.POSE_FAKES)
+        self.assertFalse(self.lua.eval('(pcall(T.emote, "dance"))'))
+        self.assertFalse(self.lua.eval('(pcall(T.emote, "clap", 0))'))
+        self.assertFalse(self.lua.eval('(pcall(T.emote, "clap", 61))'))
+        self.assertTrue(self.lua.eval('(pcall(T.emote, "wavehi02"))'))  # radial menu variants are valid
+
+    def test_sit_on_ground_then_get_up_the_vanilla_way(self):
+        self.lua.execute(self.POSE_FAKES)
+        self.lua.execute('T.sit()')
+        self.assertEqual(self.lua.eval('PLAYER.events[1]'), 'EventSitOnGround')
+        self.lua.execute('PLAYER.ground = true')
+        self.assertTrue(self.lua.eval('T.seated()'))
+        self.lua.execute('T.getUp()')
+        self.assertTrue(self.lua.eval('PLAYER.stopped'))
+        self.assertTrue(self.lua.eval('PLAYER.vars.forceGetUp'))
+
+    def test_sit_on_furniture_queues_the_rest_action_after_the_path(self):
+        self.lua.execute(self.POSE_FAKES)
+        self.lua.execute('CHAIR = { name = "chair" }; T.sitOn(CHAIR)')
+        self.assertEqual(self.lua.eval('QUEUE[1].kind'), 'path')
+        self.lua.execute('''local a = QUEUE[1]; a.goalFurnitureObject = CHAIR
+            a.done[1](a.done[2], a.done[3])''')  # the game found the seat
+        self.assertEqual(self.lua.eval('QUEUE[1].after.kind'), 'rest')
+        self.assertTrue(self.lua.eval('QUEUE[1].after.anims'))
+        self.assertTrue(self.lua.eval('QUEUE[1].after.bed == CHAIR'))
+
+    def test_crouch_toggles_sneaking(self):
+        self.lua.execute(self.POSE_FAKES)
+        self.lua.execute('T.crouch(true)')
+        self.assertTrue(self.lua.eval('PLAYER.sneak'))
+        self.lua.execute('T.crouch(false)')
+        self.assertFalse(self.lua.eval('PLAYER.sneak'))
+
+    def test_emote_list_has_the_radial_menu_variants(self):
+        self.assertTrue(self.lua.eval('PZDevKit.World.EMOTES.saluteformal'))
+
 
 if __name__ == '__main__':
     unittest.main()

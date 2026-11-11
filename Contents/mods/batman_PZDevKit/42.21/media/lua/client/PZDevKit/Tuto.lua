@@ -133,6 +133,43 @@ function PZDevKit.Tuto.new()
         return false
     end
     function T.face(x, y) T.player:faceLocation(x, y) end
+
+    -- ------------------------------------------------------------------ gestures and poses (ADR-002)
+    -- Vanilla emote of the radial menu (W.EMOTES). hold = seconds before stopping a looping one (optional).
+    -- In a step: run = function() T.emote("thumbsup") end, until_ = T.emoteDone
+    function T.emote(name, hold)
+        assert(W.EMOTES[name], "unknown emote, use an exact vanilla id: " .. tostring(name))
+        assert(hold == nil or (type(hold) == "number" and hold > 0 and hold <= 60), "emote hold: 0 to 60 s")
+        T.gesture = { at = getTimestampMs(), hold = hold }
+        T.player:playEmote(name)
+    end
+    function T.emoteDone()
+        local g = T.gesture
+        if g and g.hold and getTimestampMs() - g.at >= g.hold * 1000 then T.player:setVariable("EmotePlaying", false) end
+        if T.player:getVariableBoolean("EmotePlaying") then return false end
+        T.gesture = nil
+        return true
+    end
+    -- Poses, the player's own vanilla gestures: the sit key, the Rest entry of a seat, crouching, getting up.
+    function T.sit()
+        T.player:setAutoWalk(false)
+        T.player:reportEvent("EventSitOnGround")
+    end
+    function T.sitOn(seat)
+        local path = ISPathFindAction:pathToSitOnFurniture(T.player, seat, true)
+        path:setOnComplete(function(action)
+            local rest = ISRestAction:new(T.player, action.goalFurnitureObject or seat, true)
+            if action:addAfter(rest) == nil then ISTimedActionQueue.add(rest) end
+        end, path)
+        path:setOnFail(function() T.rec(false, "sit on furniture", "no free seat on this object") end)
+        ISTimedActionQueue.add(path)
+    end
+    function T.crouch(on) T.player:setSneaking(on ~= false) end
+    function T.getUp()
+        T.player:StopAllActionQueue()
+        T.player:setVariable("forceGetUp", true)
+    end
+    function T.seated() return T.player:isSitting() end
     -- Game speed, time, held weather, night darkness and zoom: PZDevKit.World (a speed-up asked while walking is
     -- applied when the walk ends; fast forward during a walk would cancel it).
     function T.speed(n) return W.speed(n) end

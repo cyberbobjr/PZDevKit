@@ -7,11 +7,7 @@ PZDevKit = PZDevKit or {}
 local D = PZDevKit.Production or {}
 PZDevKit.Production = D
 local P = PZDevKit.Scenario
-local emotes={wavehi=true,wavehi02=true,wavebye=true,clap=true,clap02=true,thumbsup=true,
-    thankyou=true,insult=true,stop=true,stop02=true,surrender=true,thumbsdown=true,followme=true,
-    comehere=true,comehere02=true,yes=true,no=true,shrug=true,undecided=true,ceasefire=true,
-    signalok=true,moveout=true,freeze=true,followbehind=true,signalfire=true,comefront=true,
-    saluteformal=true,salutecasual=true}
+local emotes=PZDevKit.World.EMOTES
 
 local function fraction(value)
     value=value or 1
