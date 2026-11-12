@@ -70,7 +70,17 @@ function PZDevKit.Tuto.new()
         local console = UIManager.getDebugConsole and UIManager.getDebugConsole()
         if console then console:setVisible(false) end
         if ISCharacterInfoWindow and ISCharacterInfoWindow.instance then ISCharacterInfoWindow.instance:setVisible(false) end
+        -- the game shows the inventory/loot panels again during some actions (furniture placement): a half-transparent
+        -- strip then covers the right of the picture
+        T.inventories(false)
         T.clearZombies()
+        -- a cursor resting on the left sidebar shows its tooltip ("Designated Zones") on every image: park it
+        -- low on the right, where nothing reacts to it (menus opened by T.showMenuPath do not use the cursor)
+        if getMouseX and getMouseX() < 80 then
+            local core = getCore()
+            local sx, sy = core:getScreenWidth() * 0.75, core:getScreenHeight() * 0.85
+            setMouseXY(math.floor(sx), math.floor(sy + core:getOffscreenHeight(0) - core:getScreenHeight()))
+        end
     end
 
     function T.inventories(visible)
@@ -105,11 +115,11 @@ function PZDevKit.Tuto.new()
     function T.walkTo(x, y, z)
         local target = T.sq(x, y, z)
         if not target then return end
-        if T.clearWalk(target) then
-            ISTimedActionQueue.add(ISWalkToTimedAction:new(T.player, target))
-        else
-            T.teleport(x + 0.5, y + 0.5, z or 0)
-        end
+        -- never a jump instead of a walk (user rule, 2026-11-12: teleport only to go elsewhere on the map): a path
+        -- that is not straight goes through the game's path finding (doors); a scene that needs a far place teleports
+        -- itself with T.teleport
+        if not T.clearWalk(target) then T.info("walkTo: no straight path, the game's path finding walks it") end
+        ISTimedActionQueue.add(ISWalkToTimedAction:new(T.player, target))
     end
 
     function T.nearSquare(s)
@@ -133,6 +143,48 @@ function PZDevKit.Tuto.new()
         return false
     end
     function T.face(x, y) T.player:faceLocation(x, y) end
+
+    -- Turning on the spot, seen by the camera: T.turn("S") sets the direction the body must reach; the step waits
+    -- with until_ = T.turned (the animation angle has reached it). faceLocation alone changes the logical direction
+    -- but the body may stay as it was (a goodbye wave was seen from the back, 2026-11-12). If the body has not
+    -- turned after 1.5 s, it is set at once. "S" (+y) and "E" (+x) face the camera; "SE" faces it straight.
+    local DIRS = { N = { 0, -1 }, NE = { 1, -1 }, E = { 1, 0 }, SE = { 1, 1 }, S = { 0, 1 }, SW = { -1, 1 },
+        W = { -1, 0 }, NW = { -1, -1 } }
+    local function angleOf(x, y) return math.deg(math.atan2(y, x)) end
+    function T.turn(dir)
+        local v = assert(DIRS[dir], "T.turn: N, NE, E, SE, S, SW, W or NW")
+        T.turning = { x = v[1], y = v[2], at = getTimestampMs() }
+        T.player:setForwardDirection(v[1], v[2])
+    end
+    -- Goodbye at the end of a tutorial (user rule, 2026-11-12): ONE wave, never a chain (a chain raises the hand,
+    -- lowers it and waves again). The player then stays facing the camera until `secs` seconds (3 by default) have
+    -- passed. Use after T.turn("SE") + T.turned:
+    --   T.step({ wait = 0.5, until_ = T.goodbyeDone, limit = 8, run = function() T.goodbye() end })
+    function T.goodbye(secs)
+        T.bye = { at = getTimestampMs(), secs = secs or 3 }
+        T.player:playEmote("wavebye")
+    end
+    function T.goodbyeDone()
+        local b = T.bye
+        if not b then return true end
+        local elapsed = (getTimestampMs() - b.at) / 1000
+        if elapsed >= b.secs and not T.player:getVariableBoolean("EmotePlaying") then T.bye = nil; return true end
+        return false
+    end
+    function T.turned()
+        local t = T.turning
+        if not t then return true end
+        local d = math.abs(T.player:getAnimAngle() - angleOf(t.x, t.y)) % 360
+        if d > 180 then d = 360 - d end
+        if d < 12 then T.turning = nil; return true end
+        if getTimestampMs() - t.at > 1500 then
+            T.player:setTargetAndCurrentDirection(t.x, t.y)
+            T.info("turn: body set at once to " .. t.x .. "," .. t.y)
+            T.turning = nil
+            return true
+        end
+        return false
+    end
 
     -- ------------------------------------------------------------------ gestures and poses (ADR-002)
     -- Vanilla emote of the radial menu (W.EMOTES). hold = seconds before stopping a looping one (optional).
@@ -243,7 +295,7 @@ function PZDevKit.Tuto.new()
     -- "*" follows the first submenu that is not a debug one. T.menuDone() tells when the last entry
     -- is highlighted; T.clickMenu() then runs it as a click does.
     local DEBUG_ENTRIES = { "^Tile Report", "^Room Report", "^Coordinates Report", "^Seed", "^Debug", "^Inspect", "^Object",
-        "^Teleport", "^Remove", "^Spawn", "^Zombie", "^Light", "^Fluid", "^Entity", "^Durability", "container distro" }
+        "^Teleport", "^Remove", "^Spawn", "^Zombie", "^Light", "^Fluid", "^Entity", "^Durability", "container distro", "^PZDirector" }
     -- A mod's own menu callback to keep although its name looks like a debug entry (e.g. its "Inspect").
     function T.keepEntry(callback) if callback then T.kept[callback] = true end end
     local function dropDebug(menu)
