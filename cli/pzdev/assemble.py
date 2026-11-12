@@ -39,7 +39,9 @@ GAME_MUSIC = Path(os.environ.get("PZ_GAME_DIR", r"D:\SteamLibrary\steamapps\comm
 FONTS = Path(os.environ.get("WINDIR", r"C:\Windows")) / "Fonts"
 W, H, FPS = 1920, 1080, 30
 INTRO_SHOT, FLASH, TITLE = 0.55, 0.08, 3.0
-OUTRO_DEFAULT = 6.0
+OUTRO_DEFAULT = 7.0
+# the end card must stay readable at least 5 s once its fades are counted (user, 2026-11-12)
+OUTRO_MIN = 6.5
 MUSIC_BODY = 0.13   # music level under the game sound of the body
 ACCENT = (242, 178, 51)
 
@@ -124,7 +126,7 @@ def edit_body(build: Path, caps: dict, tmp: Path, max_speed: float, voice: dict 
         raise SystemExit("take rejected, FAIL lines (Lua error shown on screen, missing step...): "
                          + " | ".join(tl["fails"]) + " -- fix the scene and record again (TUTO_FORCE=1 to override).")
     cuts = tl.get("cuts", [])
-    segs, out_t, subs = [], 0.0, []
+    segs, out_t, subs, xcuts = [], 0.0, [], []
     for i, m in enumerate(marks):
         a = m["t"]
         b = marks[i + 1]["t"] if i + 1 < len(marks) else end
@@ -152,20 +154,17 @@ def edit_body(build: Path, caps: dict, tmp: Path, max_speed: float, voice: dict 
         seg = tmp / f"seg{n:02d}.mkv"
         inputs = ["-ss", f"{a:.3f}", "-to", f"{b:.3f}", "-i", str(build / "body_raw.mp4"),
                   "-ss", f"{a:.3f}", "-to", f"{b:.3f}", "-i", str(build / "body.wav")]
-        # a cut (teleport) dips to black for 0.3 s, so the change of place reads as an edit
-        dips = ""
+        # a cut (teleport) becomes a cross-fade between the two places (user, 2026-11-12: "fondus enchaines"),
+        # applied on the whole body once it is joined (crossfade_cuts), so a cut at a segment start fades too.
         # A teleport usually runs in the very step that starts a caption: its time equals the segment
-        # start, so the bounds include it (a 0.3 s dip at the start of the segment). Inside a "keep"
-        # segment, the time is mapped onto the kept parts (a cut in the dropped middle dips at the join).
+        # start, so the bounds include it. Inside a "keep" segment, the time is mapped onto the kept parts.
         for c in cuts:
             if a - 0.05 <= c < b:
                 rel = c - a
                 if cut_v:
                     rel = rel if rel < k1 else (k1 if rel < k2 else rel - (k2 - k1))
-                lt = max(0.15, rel / speed)
-                dips += f",drawbox=x=0:y=0:w=iw:h=ih:color=black@1:t=fill:enable='between(t,{lt - 0.15:.3f},{lt + 0.15:.3f})'"
+                xcuts.append(out_t + max(0.0, rel / speed))
         vf = f"[0:v]fps={FPS},setpts=PTS-STARTPTS,{cut_v}setpts=PTS/{speed:.4f},scale={W}:{H}:flags=lanczos,fps={FPS}"
-        vf += dips
         if hold > 0.01:
             vf += f",tpad=stop_mode=clone:stop_duration={hold:.3f}"
         af = (f"[1:a]asetpts=PTS-STARTPTS,{cut_a}{atempo(speed)},aresample=48000,aformat=channel_layouts=stereo,"
@@ -190,8 +189,37 @@ def edit_body(build: Path, caps: dict, tmp: Path, max_speed: float, voice: dict 
     body = tmp / "body.mkv"
     run(["-f", "concat", "-safe", "0", "-i", str(lst), "-c:v", "copy",
          "-af", "loudnorm=I=-16:TP=-1.5:LRA=11", "-ar", "48000", "-c:a", "pcm_s16le", str(body)])
+    if xcuts:
+        body = crossfade_cuts(body, xcuts, out_t, tmp)
     idle_check(body)
     return body, out_t, subs
+
+
+XFADE = 0.6  # cross-fade length at a change of place (s)
+
+
+def crossfade_cuts(body: Path, cuts: list, total: float, tmp: Path) -> Path:
+    """Replace each hard cut (teleport) by a cross-fade, length unchanged: the last image of the old place
+    (taken 0.1 s before the cut, surely still the old place) is held and fades into the new place from
+    0.25 s after the cut (surely rendered). Subtitles and audio keep their times."""
+    parts, cur = [], "[0:v]"
+    for i, t in enumerate(sorted(cuts)):
+        t0, t1 = max(0.04, t - 0.1), t + 0.25
+        if t1 + XFADE >= total - 0.1:
+            continue
+        hold = (t1 - t0) + XFADE
+        parts.append(f"{cur}split[a{i}][b{i}];"
+                     f"[a{i}]trim=end={t0:.3f},setpts=PTS-STARTPTS,tpad=stop_mode=clone:stop_duration={hold:.3f}[pa{i}];"
+                     f"[b{i}]trim=start={t1:.3f},setpts=PTS-STARTPTS[pb{i}];"
+                     f"[pa{i}][pb{i}]xfade=transition=fade:duration={XFADE}:offset={t1:.3f}[v{i}]")
+        cur = f"[v{i}]"
+    if not parts:
+        return body
+    out = tmp / "body_xfade.mkv"
+    run(["-i", str(body), "-filter_complex", ";".join(parts), "-map", cur, "-map", "0:a", "-c:v", "libx264",
+         "-crf", "17", "-preset", "medium", "-pix_fmt", "yuv420p", "-c:a", "copy", str(out)])
+    print(f"cross-fades: {len(parts)} at " + ", ".join(f"{t:.1f} s" for t in sorted(cuts)))
+    return out
 
 
 def idle_check(video: Path, limit: float = 2.5):
@@ -294,7 +322,7 @@ def main(argv=None):
         else:
             body, body_d, subs = edit_body(build, caps, tmp, max_speed, voice)
         music_body = MUSIC_BODY * (0.6 if voice else 1.0)
-        OUTRO = float(cfg.get("outro", OUTRO_DEFAULT))  # 5 s minimum for the YouTube end screen
+        OUTRO = max(OUTRO_MIN, float(cfg.get("outro", OUTRO_DEFAULT)))  # end card fully shown >= 5 s
         # ---------------- intro: quick shots, flashes, title
         shots = []
         for i, f in enumerate((0.30, 0.55, 0.80)):
