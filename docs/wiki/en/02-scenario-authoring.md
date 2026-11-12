@@ -1,6 +1,6 @@
 # Writing scenarios for PZDevKit (formerly PZPuppeteer)
 
-This contract is for mod developers and coding agents. Target: Project Zomboid 42.21; public namespace: `PZPuppet`. The engine is generic: scenarios drive the character's Lua actions and interface callbacks, then observe their results.
+This contract is for mod developers and coding agents. Target: Project Zomboid 42.22 (42.22.2); public namespace: `PZPuppet`. The engine is generic: scenarios drive the character's Lua actions and interface callbacks, then observe their results.
 
 ## Expected deliverables from a test author
 

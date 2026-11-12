@@ -424,7 +424,8 @@ class Runner:
         return core.hooks_text(self.project, self.opts.mode, self.opts.lua, self.opts.done_lua)
 
     def mods(self):
-        gv = core.version_tuple(str(self.project.conf.get('gameVersion', '42.21'))) or (42, 21)
+        gv = (core.version_tuple(str(self.project.conf.get('gameVersion', core.DEFAULT_GAME_VERSION)))
+              or core.version_tuple(core.DEFAULT_GAME_VERSION))
         return core.resolve_mods(self.project, self.env.workshop, gv)
 
     def new_cache(self, label: str) -> Path:

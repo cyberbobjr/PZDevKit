@@ -61,7 +61,7 @@ configuration réelle : `RadioSurvivor/autotest.json`.
 
 | Clé | Rôle |
 |---|---|
-| `name`, `gameVersion` | Nom affiché ; version cible pour choisir la variante `42.x` des `mod.info` (défaut 42.21). |
+| `name`, `gameVersion` | Nom affiché ; version cible pour choisir la variante `42.x` des `mod.info` (défaut 42.22.2). |
 | `mods` | Liste dans l'ordre de chargement : `{"path": "..."}` (relatif au projet) ou `{"workshop": "<n°>", "id": "..."}` (lu dans `108600`, jamais écrit). Le pilote est ajouté en dernier. |
 | `hooks` ou `lua` | Fichier Lua des hooks, ou corps Lua en ligne `{"start", "done", "result"}` (`P = ctx.params`). Une section (`sp`, `server`, `mp`) peut les redéfinir. |
 | `params` | Paramètres par défaut (la section peut en ajouter). |

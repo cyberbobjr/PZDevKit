@@ -14,6 +14,7 @@ ZOMBOID = Path(os.environ.get('USERPROFILE') or str(Path.home())) / 'Zomboid'
 PROJECT_DIR = Path(__file__).resolve().parents[2]
 DRIVER_DIR = PROJECT_DIR / 'Contents' / 'mods' / 'batman_PZDevKit'
 DRIVER_ID = 'batman_PZDevKit'
+DEFAULT_GAME_VERSION = '42.22.2'  # game build actually run; picks the 42.x mod.info variant
 LUA_DIR = 'pz-autotest'  # under <cachedir>/Lua
 RESET_MARKER = 'If this file does not exist, default.txt will be reset to empty (no mods active).'
 WINDOW = {'width': '1280', 'height': '720', 'fullScreen': 'false', 'borderless': 'false'}
@@ -86,9 +87,10 @@ def read_mod_info(path: Path) -> dict:
     return out
 
 
-def active_mod_info(folder: Path, game_version: tuple[int, ...] = (42, 21)) -> Path | None:
+def active_mod_info(folder: Path, game_version: tuple[int, ...] | None = None) -> Path | None:
     """mod.info that the game reads for this mod folder: newest numeric variant <= game version, then common/,
     then the root (old layout)."""
+    game_version = game_version or version_tuple(DEFAULT_GAME_VERSION)
     best, best_v = None, None
     if folder.is_dir():
         for child in folder.iterdir():
@@ -105,12 +107,12 @@ def active_mod_info(folder: Path, game_version: tuple[int, ...] = (42, 21)) -> P
     return None
 
 
-def mod_id(folder: Path, game_version=(42, 21)) -> str | None:
+def mod_id(folder: Path, game_version=None) -> str | None:
     info = active_mod_info(folder, game_version)
     return read_mod_info(info).get('id') if info else None
 
 
-def resolve_mods(project: Project, workshop: Path = STEAM_WORKSHOP, game_version=(42, 21)) -> list[tuple[str, Path]]:
+def resolve_mods(project: Project, workshop: Path = STEAM_WORKSHOP, game_version=None) -> list[tuple[str, Path]]:
     """(id, source folder) of every mod of the configuration, in load order, then the driver."""
     out = []
     for i, entry in enumerate(project.conf['mods']):

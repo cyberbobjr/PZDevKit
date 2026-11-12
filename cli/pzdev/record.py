@@ -86,7 +86,7 @@ def build(video: Path, rehearse: bool, extra: list[str], live: bool = False):
         k, _, v = e.partition("=")
         params[k] = v
     auto = {
-        "name": "Tutorial-" + cfg["slug"], "gameVersion": cfg.get("gameVersion", "42.21"),
+        "name": "Tutorial-" + cfg["slug"], "gameVersion": cfg.get("gameVersion", "42.22.2"),
         "mods": [{"path": str((WORKSHOP / m).resolve())} for m in cfg["mods"]],
         "hooks": "hooks.lua", "runsDir": str((out / "runs").resolve()), "params": params,
         "sp": {"save": cfg["save"], "gameMode": cfg.get("gameMode", "Apocalypse"), "saveMods": "replace",
