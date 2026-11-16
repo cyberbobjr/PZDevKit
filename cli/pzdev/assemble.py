@@ -394,7 +394,7 @@ def main(argv=None):
              "-crf", "20", "-c:a", "copy", f"{slug}.preview-fr.mp4"], cwd=video)
         total = duration(final)
         print(f"{final.name}: {total:.1f} s (intro {intro_d:.1f} s, body {body_d:.1f} s, outro {OUTRO:.1f} s), "
-              f"{len(subs)} subtitles" + ("  WARNING: over 60 s" if total > 60 else ""))
+              f"{len(subs)} subtitles")
     return 0
 
 
