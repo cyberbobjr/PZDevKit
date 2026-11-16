@@ -69,10 +69,21 @@ function PZDevKit.Tuto.new()
         end
         local console = UIManager.getDebugConsole and UIManager.getDebugConsole()
         if console then console:setVisible(false) end
-        if ISCharacterInfoWindow and ISCharacterInfoWindow.instance then ISCharacterInfoWindow.instance:setVisible(false) end
+        -- a scene that shows the character window (Info tab...) keeps it: T.showCharacter = true
+        if ISCharacterInfoWindow and ISCharacterInfoWindow.instance and not T.showCharacter then
+            ISCharacterInfoWindow.instance:setVisible(false)
+        end
         -- the game shows the inventory/loot panels again during some actions (furniture placement): a half-transparent
         -- strip then covers the right of the picture
-        T.inventories(false)
+        -- a scene that works in the inventory window (item menus) keeps it: T.showInventory = true
+        if T.showInventory then
+            -- the player's inventory only (the loot window would cover the scene)
+            if getPlayerInventory(0) then getPlayerInventory(0):setVisible(true) end
+            if getPlayerLoot(0) then getPlayerLoot(0):setVisible(false) end
+        else
+            T.inventories(false)
+        end
+        if T.cursorEl then T.cursorEl:bringToTop() end
         T.clearZombies()
         -- a cursor resting on the left sidebar shows its tooltip ("Designated Zones") on every image: park it
         -- low on the right, where nothing reacts to it (menus opened by T.showMenuPath do not use the cursor)
@@ -294,7 +305,7 @@ function PZDevKit.Tuto.new()
     -- slides in `perLevel` seconds later. path: texts (or text prefixes) of the options to follow;
     -- "*" follows the first submenu that is not a debug one. T.menuDone() tells when the last entry
     -- is highlighted; T.clickMenu() then runs it as a click does.
-    local DEBUG_ENTRIES = { "^Tile Report", "^Room Report", "^Coordinates Report", "^Seed", "^Debug", "^Inspect", "^Object",
+    local DEBUG_ENTRIES = { "^%[Debug%]", "^Tile Report", "^Room Report", "^Coordinates Report", "^Seed", "^Debug", "^Inspect", "^Object",
         "^Teleport", "^Remove", "^Spawn", "^Zombie", "^Light", "^Fluid", "^Entity", "^Durability", "container distro", "^PZDirector" }
     -- A mod's own menu callback to keep although its name looks like a debug entry (e.g. its "Inspect").
     function T.keepEntry(callback) if callback then T.kept[callback] = true end end
@@ -315,11 +326,11 @@ function PZDevKit.Tuto.new()
     local function highlight(cur, want)
         local found
         for i, opt in ipairs(cur.options or {}) do
-            if not found and tostring(opt.name):sub(1, #want) == want then found = opt; cur.mouseOver = i end
+            if not found and tostring(opt.name):sub(1, #want) == want then found = opt; cur.mouseOver = i; cur.tutoOver = i end
         end
         if not found and want == "*" then
             for i, opt in ipairs(cur.options or {}) do
-                if not found and opt.subOption and not tostring(opt.name):find("^Debug") then found = opt; cur.mouseOver = i end
+                if not found and opt.subOption and not tostring(opt.name):find("^Debug") then found = opt; cur.mouseOver = i; cur.tutoOver = i end
             end
         end
         -- the game shows the submenu of the highlighted entry at once: no debug entry in it
@@ -333,6 +344,40 @@ function PZDevKit.Tuto.new()
             T.info("menu entry not found: " .. want .. " among: " .. table.concat(names, " | "))
         end
         return found
+    end
+    local function followPath(menu, path, perLevel)
+        if not menu then return end
+        dropDebug(menu)
+        T.menu = menu
+        T.menuAnim = { cur = menu, path = path or {}, n = 1, every = (perLevel or 0.9) * 1000, at = getTimestampMs() }
+        T.menuAnim.found = highlight(menu, T.menuAnim.path[1] or "")
+        T.menuFinal = (#T.menuAnim.path <= 1) and T.menuAnim.found or nil
+    end
+    -- Right-click menu of an item of the player's inventory, opened on its row of the inventory window as the mouse
+    -- does (the row is selected), then followed level by level like T.showMenuPath. The inventory window must be
+    -- visible: set T.showInventory = true in the scene (T.quiet hides it otherwise).
+    function T.showItemMenuPath(item, path, perLevel)
+        T.closeMenu()
+        local num = T.player:getPlayerNum()
+        local inv = getPlayerInventory(num)
+        local pane = inv and inv.inventoryPane
+        local x, y = math.floor(getCore():getScreenWidth() / 2), math.floor(getCore():getScreenHeight() / 3)
+        if pane then
+            pane:refreshContainer()
+            for i, v in ipairs(pane.itemslist or {}) do
+                local hit = false
+                for _, it in ipairs(v.items or {}) do if it == item then hit = true end end
+                if hit then
+                    pane.selected = {}
+                    pane.selected[i] = v
+                    x = pane:getAbsoluteX() + 90
+                    y = pane:getAbsoluteY() + pane.headerHgt + (i - 1) * pane.itemHgt + pane:getYScroll() + math.floor(pane.itemHgt / 2)
+                    break
+                end
+            end
+        end
+        followPath(ISInventoryPaneContextMenu.createMenu(num, true, { item }, x, y), path, perLevel)
+        if T.cursorEl then T.cursorEl:bringToTop() end
     end
     function T.showMenuPath(obj, path, perLevel)
         T.closeMenu()
@@ -350,7 +395,10 @@ function PZDevKit.Tuto.new()
     end
     -- Called by the runner at each poll.
     function T.menuTick()
+        if T.cursorEl then T.cursorEl:bringToTop() end
         local a = T.menuAnim
+        -- the real mouse moving over the menu would move the highlight: keep the scripted entry highlighted
+        if a and a.cur and a.cur.tutoOver then a.cur.mouseOver = a.cur.tutoOver end
         if not a or T.menuFinal or not a.found then return end
         local now = getTimestampMs()
         if now - a.at < a.every then return end
@@ -376,6 +424,115 @@ function PZDevKit.Tuto.new()
     function T.closeMenu()
         if T.menu then T.menu:closeAll() end
         T.menu, T.menuAnim, T.menuFinal = nil, nil, nil
+    end
+
+    -- ------------------------------------------------------------------ visible mouse cursor
+    -- The recording never shows the real pointer: a drawn cursor (the game's own cursor_white.png) glides to what the
+    -- scene points at, so the viewer sees where a right-click or a click happens. T.cursorTo(x, y, secs), then
+    -- until_ = T.cursorDone; T.cursorClick() plays a short press. Helpers aim at an inventory row, a menu entry or a
+    -- UI element. T.cursorHide() at the end.
+    local CursorUI
+    local function cursorUI()
+        if T.cursorEl then return T.cursorEl end
+        CursorUI = CursorUI or ISUIElement:derive("PZDevKitTutoCursor")
+        function CursorUI:render()
+            local c = T.cursor
+            if not c then return end
+            local now = getTimestampMs()
+            local k = c.secs > 0 and math.min(1, (now - c.at) / (c.secs * 1000)) or 1
+            k = k * k * (3 - 2 * k)
+            c.x, c.y = c.x0 + (c.x1 - c.x0) * k, c.y0 + (c.y1 - c.y0) * k
+            local s = (c.pressUntil and now < c.pressUntil) and 0.8 or 1
+            local size = math.floor(32 * s * math.max(1, getCore():getScreenHeight() / 1080))
+            self:drawTextureScaled(T.cursorTex, c.x - self:getAbsoluteX(), c.y - self:getAbsoluteY(), size, size, 1, 1, 1, 1)
+        end
+        -- a 1x1 element (never in the way of the mouse) that draws the cursor anywhere on the screen
+        local el = CursorUI:new(0, 0, 1, 1)
+        el:initialise()
+        el:addToUIManager()
+        el:setAlwaysOnTop(true)
+        T.cursorTex = getTexture("media/ui/cursor_white.png")
+        T.cursorEl = el
+        return el
+    end
+    function T.cursorTo(x, y, secs)
+        cursorUI()
+        local c = T.cursor
+        local x0 = c and c.x or getCore():getScreenWidth() * 0.6
+        local y0 = c and c.y or getCore():getScreenHeight() * 0.6
+        T.cursor = { x0 = x0, y0 = y0, x1 = x, y1 = y, x = x0, y = y0, at = getTimestampMs(), secs = secs or 0.8 }
+        T.cursorEl:bringToTop()
+    end
+    function T.cursorDone()
+        local c = T.cursor
+        return c == nil or getTimestampMs() - c.at >= c.secs * 1000
+    end
+    function T.cursorClick() if T.cursor then T.cursor.pressUntil = getTimestampMs() + 220 end end
+    function T.cursorHide()
+        if T.cursorEl then T.cursorEl:removeFromUIManager() end
+        T.cursorEl, T.cursor = nil, nil
+    end
+    -- Screen position of an item's row in the inventory window (nil if not shown).
+    function T.itemRowPos(item)
+        local inv = getPlayerInventory(T.player:getPlayerNum())
+        local pane = inv and inv.inventoryPane
+        if not pane then return nil end
+        pane:refreshContainer()
+        for i, v in ipairs(pane.itemslist or {}) do
+            for _, it in ipairs(v.items or {}) do
+                if it == item then
+                    return pane:getAbsoluteX() + 90, pane:getAbsoluteY() + pane.headerHgt + (i - 1) * pane.itemHgt
+                        + pane:getYScroll() + math.floor(pane.itemHgt / 2)
+                end
+            end
+        end
+    end
+    -- Glide to an inventory item's row.
+    function T.cursorToItem(item, secs)
+        local x, y = T.itemRowPos(item)
+        if x then T.cursorTo(x, y, secs) end
+        return x ~= nil
+    end
+    -- Glide to the highlighted entry of the menu shown by T.showMenuPath / T.showItemMenuPath.
+    function T.cursorToMenuEntry(secs)
+        local a = T.menuAnim
+        local m = a and a.cur
+        local idx = m and m.mouseOver
+        if not idx or idx < 1 then return false end
+        T.cursorTo(m:getAbsoluteX() + 40, m:getAbsoluteY() + m.padTopBottom + (idx - 1) * m.itemHgt + m.itemHgt / 2
+            - m:getYScroll(), secs or 0.5)
+        return true
+    end
+    -- Glide to the centre of a UI element (button, text box, panel).
+    function T.cursorToUI(el, secs, dx, dy)
+        if not el then return false end
+        T.cursorTo(el:getAbsoluteX() + (dx or el:getWidth() / 2), el:getAbsoluteY() + (dy or el:getHeight() / 2), secs)
+        return true
+    end
+    -- A visible button of a window, found by its title (deep search among the children), or nil.
+    function T.findButton(root, title)
+        if not root then return nil end
+        if root.Type == "ISButton" and root.title == title and root:isReallyVisible() then return root end
+        for _, child in pairs(root:getChildren() or {}) do
+            local hit = T.findButton(child, title)
+            if hit then return hit end
+        end
+    end
+    -- The inventory window opened, unfolded and pinned like a player does, at (x, y) with the given size.
+    function T.openInventory(x, y, w, h)
+        T.showInventory = true
+        local inv = getPlayerInventory(T.player:getPlayerNum())
+        if not inv then return end
+        inv:setVisible(true)
+        if getPlayerLoot(T.player:getPlayerNum()) then getPlayerLoot(T.player:getPlayerNum()):setVisible(false) end
+        inv:setPinned()
+        inv.isCollapsed = false
+        inv:clearMaxDrawHeight()
+        if x then inv:setX(x) end
+        if y then inv:setY(y) end
+        if w then inv:setWidth(w) end
+        if h then inv:setHeight(h) end
+        inv.inventoryPane:refreshContainer()
     end
 
     -- ------------------------------------------------------------------ live takes
