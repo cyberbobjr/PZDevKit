@@ -147,10 +147,14 @@ def build_client_cache(env: Env, cache: Path, mods, command: str, hooks: str, sa
     write_lua_files(cache, command, hooks)
 
 
-def build_server_cache(cache: Path, mods, name: str, ini: str, command: str, hooks: str) -> None:
+def build_server_cache(cache: Path, mods, name: str, ini: str, command: str, hooks: str,
+                       save: Path | None = None) -> None:
+    """save: a world folder (Saves/Multiplayer/<name> of an earlier server) copied as this server's world."""
     copy_mods(mods, cache / 'mods')
     (cache / 'Server').mkdir(parents=True, exist_ok=True)
     (cache / 'Server' / f'{name}.ini').write_bytes(ini.encode('utf-8'))
+    if save:
+        shutil.copytree(save, cache / 'Saves' / 'Multiplayer' / name)
     write_lua_files(cache, command, hooks)
 
 
@@ -640,13 +644,16 @@ class Runner:
         if self.opts.mode == 'mp' and self.setting('spawn'):
             ini_extra.setdefault('SpawnPoint', self.setting('spawn'))
         ini = core.server_ini([m for m, _ in mods], port, ini_extra)
+        save = self.server_save()
         cache = self.new_cache('server')
         command = core.command_text(self.token, 'server', params=self.params, control=control, run=run,
                                     startDelaySec=self.opts.start_delay if self.opts.start_delay is not None
                                     else self.setting('startDelaySec', 2),
                                     timeoutSec=self.opts.lua_timeout or None, players=players or None,
                                     playerWaitSec=self.setting('playerWaitSec') if players else None)
-        build_server_cache(cache, mods, name, ini, command, hooks)
+        build_server_cache(cache, mods, name, ini, command, hooks, save)
+        if save:
+            log(f'server world {save} (copy)')
         admin, password = 'pzat_admin', secrets.token_hex(8)
         self.own.append(password)
         argv = self.env.server_argv(cache, name, admin, password,
@@ -655,6 +662,17 @@ class Runner:
         proc = Proc('server', 'server', cache, self.token, run=run)
         log(f'PZAT_SERVER_CACHE={cache} (server {name}, port {port})')
         return proc, argv, password, name
+
+    def server_save(self) -> Path | None:
+        """`server.save`: world folder copied as the server's world (relative to the project), or None."""
+        value = self.project.section('server').get('save')
+        if not value:
+            return None
+        path = Path(os.path.expandvars(value))
+        path = path if path.is_absolute() else self.project.root / path
+        if not path.is_dir():
+            raise core.ConfigError(f'server: no save folder {path}')
+        return path
 
     def run_server(self, mods, hooks) -> int:
         proc, argv, admin_password, _name = self.server_setup(mods, hooks, control=False, run=True)

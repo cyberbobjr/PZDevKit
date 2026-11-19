@@ -182,6 +182,31 @@ class RunnerTest(unittest.TestCase):
         code, _, _ = self.sb.run('server', scenario='fail', timeout=30)
         self.assertEqual(code, 1)
 
+    def test_server_save_is_copied_into_the_cache(self):
+        """`server.save`: a world folder of the project is copied as the server's world; the source is untouched."""
+        world = self.sb.project / 'fixtures' / 'world'
+        (world / 'map').mkdir(parents=True)
+        (world / 'map_t.bin').write_bytes(b't')
+        (world / 'map' / '1_2.bin').write_bytes(b'c')
+        conf = json.loads((self.sb.project / 'autotest.json').read_text(encoding='utf-8').split('\n', 1)[1])
+        conf['server']['save'] = 'fixtures/world'
+        (self.sb.project / 'autotest.json').write_text(json.dumps(conf), encoding='utf-8')
+        code, _, runner = self.sb.run('server', dry_run=True, keep_cache=True)
+        self.assertEqual(code, 0, self.sb.log)
+        copied = runner.caches[0] / 'Saves' / 'Multiplayer' / 'pzat_test'
+        self.assertEqual((copied / 'map' / '1_2.bin').read_bytes(), b'c')
+        self.assertEqual((copied / 'map_t.bin').read_bytes(), b't')
+        (copied / 'map_t.bin').write_bytes(b'changed')
+        self.assertEqual((world / 'map_t.bin').read_bytes(), b't')
+
+    def test_server_save_missing_is_a_config_error(self):
+        conf = json.loads((self.sb.project / 'autotest.json').read_text(encoding='utf-8').split('\n', 1)[1])
+        conf['server']['save'] = 'fixtures/absent'
+        (self.sb.project / 'autotest.json').write_text(json.dumps(conf), encoding='utf-8')
+        code, _, _ = self.sb.run('server', timeout=30)
+        self.assertEqual(code, 2, self.sb.log)
+        self.assertIn('server: no save folder', self.sb.log)
+
     def test_mp_two_clients(self):
         code, out, _ = self.sb.run('mp', clients=2, client_run=True, timeout=60)
         self.assertEqual(code, 0, self.sb.log)
