@@ -113,7 +113,7 @@ An optional entry may provide `when=function(params) return boolean end` and a n
 
 Only one scenario or campaign can run. While a campaign awaits archival, `run`, `runFile`, `loadScenario`, another campaign and direct `scenario:run()` are refused. `PZDevKit.Scenario.batchStatus()` returns a snapshot with `token`, `status`, `index`, `total`, `path`, `runToken`, `completed`, `skipped` and optional `reason`. `PZDevKit.Scenario.runStatus()` returns `busy`, `scenario` and `batch`. `stopBatch(reason)` cancels its active child, executes cleanup once and removes the batch listener. `stop()` also stops an active campaign. A Lua engine reload stops old runners and removes their listeners before installing new ones.
 
-The engine uses the following file bridge, implemented with the inspected Build 42.21 `getFileReader`/`getFileWriter` APIs:
+The engine uses the following file bridge, implemented with the inspected Build 42.22 `getFileReader`/`getFileWriter` APIs:
 
 1. Each child writes its full report and closes both `PZPuppet/reports/<runToken>.txt` and `PZPuppet/last-report.txt`, after all cleanup. The text keeps its existing first two lines, plus `Run token`, `Batch token`, `Batch index`, `Scenario path`, `Persistent report`, `Player index` and `Manual stop` metadata.
 2. A successful child emits `[PZPuppet] Batch archive requested: <runToken> | report: PZPuppet/reports/<runToken>.txt`. The run token is also logged immediately after `Starting`. Tokens combine timestamp and a sequence preserved during Lua reloads.
