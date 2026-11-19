@@ -270,13 +270,14 @@ def tick_client(env: Env, proc: Proc) -> str | None:
 
 # ---------------------------------------------------------------- bridge
 
-def start_bridge(env: Env, project: core.Project, choice: str, exchange: Path, out_log: Path):
+def start_bridge(env: Env, project: core.Project, choice: str, exchange: Path, out_log: Path,
+                 params: dict[str, str]):
     conf = project.conf['bridge']
-    values = {'python': env.python, 'exchange': str(exchange), 'project': str(project.root)}
-    argv = core.expand_args(list(conf['command']), values)
+    values = {'python': env.python, 'exchange': str(exchange), 'project': str(project.root), 'game': str(env.game)}
+    argv = core.expand_args(list(conf['command']), values, params)
     if choice == 'offline':
-        argv += core.expand_args(list(conf.get('offlineArgs', [])), values)
-    cwd = project.root / conf.get('cwd', '.')
+        argv += core.expand_args(list(conf.get('offlineArgs', [])), values, params)
+    cwd = project.root / core.expand_text(conf.get('cwd', '.'), values, params)
     exchange.mkdir(parents=True, exist_ok=True)
     # The bridge reads its own configuration (its .env or the environment): this tool never opens it.
     proc_env = dict(os.environ, PYTHONIOENCODING='utf-8', PYTHONUNBUFFERED='1')
@@ -464,7 +465,8 @@ class Runner:
             return ''
         exchange = exchange_root / 'Lua' / conf.get('exchange', '')
         self.bridge_log = exchange_root / 'bridge.log'
-        self.bridge, why = start_bridge(self.env, self.project, choice, exchange, self.bridge_log)
+        self.bridge, why = start_bridge(self.env, self.project, choice, exchange, self.bridge_log,
+                                         self.params)
         return why
 
     # ------------------------------------------------ entry

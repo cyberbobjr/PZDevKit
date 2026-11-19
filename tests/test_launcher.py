@@ -178,6 +178,32 @@ class RunnerTest(unittest.TestCase):
         self.assertEqual(code, 0, self.sb.log)
         self.assertTrue(runner.server_debug())
 
+    def set_bridge(self, bridge):
+        conf = json.loads((self.sb.project / 'autotest.json').read_text(encoding='utf-8').split('\n', 1)[1])
+        conf['bridge'] = bridge
+        (self.sb.project / 'autotest.json').write_text(json.dumps(conf), encoding='utf-8')
+
+    def test_server_bridge_expands_game_and_params_in_command_and_cwd(self):
+        """`{game}` and `{param:NAME}` are replaced in bridge.command and bridge.cwd, like the older placeholders."""
+        (self.sb.game / 'sub').mkdir()
+        self.set_bridge({'command': ['{python}', '-c', 'import os, sys; print("READY", os.getcwd(), sys.argv[1:])',
+                                     '{game}', '{param:model}', '{project}'],
+                         'cwd': '{game}/sub', 'ready': 'READY', 'readyTimeoutSec': 20})
+        code, out, _ = self.sb.run('server', timeout=30, bridge='on', extra={'model': 'm-one'})
+        self.assertEqual(code, 0, self.sb.log)
+        text = (out / 'bridge.log').read_text(encoding='utf-8')
+        self.assertIn(str(self.sb.game / 'sub'), text)
+        self.assertIn('m-one', text)
+        self.assertIn(repr(str(self.sb.game)), text)
+
+    def test_server_bridge_missing_param_fails_and_names_it(self):
+        self.set_bridge({'command': ['{python}', '-c', 'print("READY")', '{param:model}'], 'ready': 'READY'})
+        code, out, _ = self.sb.run('server', timeout=30, bridge='on')
+        self.assertEqual(code, core.EXIT_ERROR, self.sb.log)
+        summary = json.loads((out / 'summary.json').read_text(encoding='utf-8'))
+        self.assertIn('model', summary['reason'])
+        self.assertEqual(summary['processes'], [])  # the server was not started
+
     def test_server_fail(self):
         code, _, _ = self.sb.run('server', scenario='fail', timeout=30)
         self.assertEqual(code, 1)

@@ -381,5 +381,24 @@ def bridge_wanted(choice: str, bridge: dict | None, params: dict[str, str]) -> b
     return False
 
 
-def expand_args(args: list[str], values: dict[str, str]) -> list[str]:
-    return [a.format(**values) for a in args]
+_PLACEHOLDER = re.compile(r'\{\{|\}\}|\{(param:)?([A-Za-z0-9_.-]+)\}')
+
+
+def expand_text(text: str, values: dict[str, str], params: dict[str, str] | None = None) -> str:
+    """Replaces {NAME} by values[NAME] and {param:NAME} by params[NAME]; {{ and }} stand for literal braces.
+    An unknown placeholder or a parameter without a value is a ConfigError naming it (never an empty string)."""
+    def sub(m: re.Match) -> str:
+        if m.group(0) in ('{{', '}}'):
+            return m.group(0)[0]
+        is_param, name = m.group(1), m.group(2)
+        source = (params or {}) if is_param else values
+        if name not in source:
+            if is_param:
+                raise ConfigError(f'{{param:{name}}}: no value for parameter "{name}" (-P {name}=... or "params")')
+            raise ConfigError(f'{{{name}}}: unknown placeholder (known: {", ".join(sorted(values))}, param:NAME)')
+        return str(source[name])
+    return _PLACEHOLDER.sub(sub, text)
+
+
+def expand_args(args: list[str], values: dict[str, str], params: dict[str, str] | None = None) -> list[str]:
+    return [expand_text(a, values, params) for a in args]

@@ -63,6 +63,20 @@ class CoreTest(unittest.TestCase):
         self.assertFalse(core.bridge_wanted('off', bridge, {'campaign': 'solo-rs'}))
         self.assertFalse(core.bridge_wanted('on', None, {}))
 
+    def test_expand_args_values_and_params(self):
+        values = {'python': 'py', 'game': 'G'}
+        self.assertEqual(core.expand_args(['{python}', '{game}/x', '--m={param:model}', '{{lit}}'], values,
+                                          {'model': 'm1'}),
+                         ['py', 'G/x', '--m=m1', '{lit}'])
+
+    def test_expand_args_missing_param_names_it(self):
+        with self.assertRaisesRegex(core.ConfigError, 'model'):
+            core.expand_args(['{param:model}'], {}, {})
+
+    def test_expand_args_unknown_placeholder_names_it(self):
+        with self.assertRaisesRegex(core.ConfigError, 'nope'):
+            core.expand_args(['{nope}'], {'python': 'py'})
+
     def test_redact(self):
         text, n = core.redact('a sk-abcdefghijklmnopqrstuv b OPENAI_KEY=xyz Bearer abcdefghij DEEPSEEK_API_KEY: q '
                               'lit=supersecretvalue token=abc', ['supersecretvalue'])
