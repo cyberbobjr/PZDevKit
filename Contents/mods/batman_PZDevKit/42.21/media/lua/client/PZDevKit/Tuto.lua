@@ -306,7 +306,8 @@ function PZDevKit.Tuto.new()
     -- "*" follows the first submenu that is not a debug one. T.menuDone() tells when the last entry
     -- is highlighted; T.clickMenu() then runs it as a click does.
     local DEBUG_ENTRIES = { "^%[Debug%]", "^Tile Report", "^Room Report", "^Coordinates Report", "^Seed", "^Debug", "^Inspect", "^Object",
-        "^Teleport", "^Remove", "^Spawn", "^Zombie", "^Light", "^Fluid", "^Entity", "^Durability", "container distro", "^PZDirector" }
+        "^Teleport", "^Remove", "^Spawn", "^Zombie", "^Light", "^Fluid", "^Entity", "^Durability", "container distro", "^PZDirector",
+        "%(debug%)$" }
     -- A mod's own menu callback to keep although its name looks like a debug entry (e.g. its "Inspect").
     function T.keepEntry(callback) if callback then T.kept[callback] = true end end
     local function dropDebug(menu)
