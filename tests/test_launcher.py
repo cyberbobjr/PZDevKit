@@ -6,10 +6,12 @@ from __future__ import annotations
 
 import io
 import json
+import os
 import shutil
 import sys
 import tempfile
 import unittest
+from unittest import mock
 from contextlib import redirect_stdout
 from pathlib import Path
 
@@ -120,6 +122,17 @@ class RunnerTest(unittest.TestCase):
         self.assertFalse(command.startswith(b'\xef\xbb\xbf'))
         self.assertIn(b'param.scenario=ok', command)
         self.assertIn(b'role=sp', command)
+
+    def test_save_only_mods_are_left_out_of_the_menu_list(self):
+        with mock.patch.dict(os.environ, {'PZAT_SAVE_ONLY_MODS': 'MyMod'}):
+            code, out, runner = self.sb.run('sp', dry_run=True, keep_cache=True)
+        self.assertEqual(code, 0, self.sb.log)
+        cache = runner.caches[0]
+        menu = (cache / 'mods' / 'default.txt').read_text(encoding='utf-8')
+        self.assertNotIn('MyMod', menu)
+        self.assertIn('LibMod', menu)
+        self.assertIn('batman_PZDevKit', menu)
+        self.assertIn('MyMod', (cache / 'Saves' / 'Sandbox' / 'test-save' / 'mods.txt').read_text(encoding='utf-8'))
 
     def test_sp_no_quit_becomes_the_default_live_target(self):
         code, out, runner = self.sb.run('sp', dry_run=True, keep_cache=True, no_quit=True)

@@ -125,7 +125,11 @@ def build_client_cache(env: Env, cache: Path, mods, command: str, hooks: str, sa
                        save_mods: str = 'replace') -> None:
     ids = [m for m, _ in mods]
     copy_mods(mods, cache / 'mods')
-    (cache / 'mods' / 'default.txt').write_text(core.mods_txt(ids), encoding='utf-8')
+    # PZAT_SAVE_ONLY_MODS="idA;idB": mods left out of the main-menu list, enabled by the save only (the game then
+    # reloads its Lua when the save loads, as it does for a player who enables a mod per save).
+    save_only = {m.strip() for m in os.environ.get('PZAT_SAVE_ONLY_MODS', '').split(';') if m.strip()}
+    menu_ids = [m for m in ids if m not in save_only]
+    (cache / 'mods' / 'default.txt').write_text(core.mods_txt(menu_ids), encoding='utf-8')
     # Without this marker a new cache folder gets an empty default.txt at startup (no mod at the main menu).
     (cache / 'mods' / 'reset-mods-42_00.txt').write_text(core.RESET_MARKER, encoding='utf-8')
     options = env.zomboid / 'options.ini'

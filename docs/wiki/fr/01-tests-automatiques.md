@@ -50,6 +50,7 @@ python PZDevKit/pzdev.py sp     RadioSurvivor -P suite=rs.env --dry-run --keep-c
 | `--no-quit`, `--no-screenshot`, `--keep-cache`, `--out`, `--dry-run` | Jeu laissé ouvert ; pas de capture ; caches gardés ; dossier de sortie ; préparation seule. |
 | variable `PZAT_SOUND` | `1` : le client garde le son (sans `-nosound`), pour une vidéo. Par défaut, silence. |
 | variable `PZAT_OPTIONS` | Valeurs `options.ini` en plus pour ce lancement, `clé=valeur` séparées par `;` (exemple : `language=EN` pour une vidéo en anglais). Le fichier de l'utilisateur n'est jamais modifié. |
+| variable `PZAT_SAVE_ONLY_MODS` | Identifiants de mods séparés par `;`, retirés de la liste du menu principal (`mods\default.txt`) et activés seulement par la sauvegarde (`saveMods: replace`) : reproduit un joueur qui active un mod par partie. Le jeu recharge alors son Lua au chargement de la sauvegarde. |
 
 Codes de sortie : **0** résultat OK ; **1** tests en échec ; **2** délai, démarrage raté, erreur Lua des hooks, partie
 refusée, processus tué ; **3** un jeu ou serveur tourne déjà (jamais tué).
